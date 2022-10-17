@@ -1,0 +1,85 @@
+---
+title: "hw2"
+output: html_document
+date: "2022-10-16"
+name: "Nathan De Los Santos"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(tidyverse)
+library(tidymodels)
+library(ISLR)
+library(corrplot)
+library(ggthemes)
+library(ggplot2)
+abalone_data <- read.csv('data/abalone.csv')
+```
+
+## Question 1
+```{r}
+abalone <- abalone_data %>%
+  mutate(age = abalone_data$rings + 1.5)
+
+abalone %>%
+  ggplot(aes(age)) +
+  geom_histogram(bins = 60)
+```
+Using a bin size of 60, we can see that the distribution of age in the abalone data set is slightly skewed to right. Most abalone ages are around 11.5 years old. 
+
+
+## Question 2
+```{r}
+set.seed(777)
+
+abalone_split <- initial_split(abalone, prop = 0.7)
+abalone_train <- training(abalone_split)
+abalone_test <- testing(abalone_split)
+```
+
+## Question 3
+```{r}
+abalone_recipe <- recipe(age ~ type + longest_shell + diameter + height + whole_weight + shucked_weight + viscera_weight + shell_weight, data = abalone_train) %>%
+  step_dummy(all_nominal_predictors()) %>%
+  step_interact(terms = ~ type_M:shucked_weight) %>%
+  step_interact(terms = ~ longest_shell:diameter) %>%
+  step_interact(terms = ~ shucked_weight:shell_weight) %>%
+  step_center(all_nominal_predictors()) %>%
+  step_scale(all_nominal_predictors())
+```
+
+
+
+## Question 4
+```{r}
+lm_model <- linear_reg() %>%
+  set_engine("lm")
+```
+
+## Question 5
+```{r}
+lm_wflow <- workflow() %>%
+  add_model(lm_model) %>%
+  add_recipe(abalone_recipe)
+```
+
+## Question 6
+```{r}
+lm_fit <- fit(lm_wflow, abalone_train)
+
+predict(lm_fit, data.frame(type = "F", longest_shell = 0.5, diameter = 0.1, height = 0.30, whole_weight = 4, shucked_weight = 1, viscera_weight = 2, shell_weight = 1))
+```
+
+## Question 7
+```{r}
+library(yardstick)
+
+abalone_metrics <- metric_set(rmse, rsq, mae)
+abalone_train_res <- predict(lm_fit, new_data = abalone_train)
+abalone_train_res <- bind_cols(abalone_train_res, abalone_train)
+abalone_metrics(abalone_train_res, truth = age, estimate = .pred)
+```
+We recorded an $R^s$ of 0.5539742, so only about half of the variance can be predicted/explained by the model. Therefore, this is not the greatest model to use to predict the age of an abalone.
